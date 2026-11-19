@@ -1,0 +1,16 @@
+# Python virtual environment
+env/
+venv/
+__pycache__/
+*.pyc
+
+# Local databases & generated state files
+chroma_db/
+cloud_alert.json
+
+# Environment variables / API keys
+.env
+
+# macOS system files
+.DS_Store
+cloud-agent-env/
