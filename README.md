@@ -111,4 +111,3 @@ Ensure the following tools are installed and running on your local machine befor
 ## Author
 
 * **Fahed Ahmad** — B.Tech in Artificial Intelligence & Machine Learning, University School of Automation and Robotics (USAR), GGSIPU
-* **Mentor:** Dr. Rahul Johri, Assistant Professor, USAR, GGSIPU
