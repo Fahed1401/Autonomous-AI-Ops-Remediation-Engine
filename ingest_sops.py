@@ -1,44 +1,36 @@
-import os
-from langchain_community.document_loaders import TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
+"""Build the optional persistent Chroma vector store from the demo runbook.
 
-# 1. Initialize the embedding model (runs locally on your Mac M2)
-print("Loading embedding model...")
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+The portfolio frontend works without running this script; it labels its
+runbook fallback honestly. Install requirements-ai.txt for embedding ingestion.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+from aiops.integrations import ROOT, SOP_FILE
+
 
 def ingest_documents():
-    # 2. Load the SOP document
-    file_path = "company_docs/SOP_Security_Incident_Response.md"
-    if not os.path.exists(file_path):
-        print(f"Error: Could not find {file_path}")
-        return
+    if not SOP_FILE.is_file():
+        raise FileNotFoundError(f"Missing SOP document: {SOP_FILE}")
+    try:
+        from langchain_chroma import Chroma
+        from langchain_huggingface import HuggingFaceEmbeddings
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
+        from langchain_core.documents import Document
+    except ImportError as exc:
+        raise RuntimeError("Install optional AI dependencies: pip install -r requirements-ai.txt") from exc
+    text = SOP_FILE.read_text(encoding="utf-8")
+    chunks = RecursiveCharacterTextSplitter(chunk_size=650, chunk_overlap=75).split_documents(
+        [Document(page_content=text, metadata={"source": str(SOP_FILE.relative_to(ROOT))})])
+    if not chunks:
+        raise RuntimeError("SOP is empty. Nothing to ingest.")
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    collection = Chroma.from_documents(documents=chunks, embedding=embeddings,
+                                       persist_directory=str(ROOT / "chroma_db"),
+                                       collection_name="sentinelops_sops")
+    print(f"Ingested {len(chunks)} chunks into {ROOT / 'chroma_db'}. Source: {SOP_FILE.name}")
+    return collection
 
-    loader = TextLoader(file_path)
-    documents = loader.load()
-    print(f"Loaded {len(documents)} document(s).")
-
-    # 3. Split the document into smaller chunks for the AI to digest easily
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500, 
-        chunk_overlap=50,
-        separators=["\n\n", "\n", " ", ""]
-    )
-    chunks = text_splitter.split_documents(documents)
-    print(f"Split document into {len(chunks)} chunks.")
-
-    # 4. Create the ChromaDB vector store and save it locally
-    db_directory = "./chroma_db"
-    print("Embedding chunks and saving to ChromaDB...")
-    
-    vector_store = Chroma.from_documents(
-        documents=chunks, 
-        embedding=embeddings, 
-        persist_directory=db_directory
-    )
-    
-    print(f"Success! Vector database saved locally in the '{db_directory}' folder.")
 
 if __name__ == "__main__":
     ingest_documents()

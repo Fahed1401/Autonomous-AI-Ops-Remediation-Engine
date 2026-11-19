@@ -1,16 +1,14 @@
-# Python virtual environment
-env/
-venv/
 __pycache__/
-*.pyc
-
-# Local databases & generated state files
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+cloud-agent-env/
+.DS_Store
+.env
+.env.*
+!.env.example
 chroma_db/
 cloud_alert.json
-
-# Environment variables / API keys
-.env
-
-# macOS system files
-.DS_Store
-cloud-agent-env/
+.runtime/
+*.log

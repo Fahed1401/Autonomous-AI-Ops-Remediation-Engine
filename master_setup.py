@@ -1,53 +1,33 @@
-import boto3
+"""Provision a single intentionally vulnerable demo security group in LOCALSTACK.
+
+WARNING: This script intentionally opens SSH globally, ONLY in LocalStack.
+Never use this fixture against a real AWS endpoint.
+"""
+from __future__ import annotations
+
 import json
 import time
+from pathlib import Path
 
-def setup_synced_scenario():
-    print("🛠️  Step 1: Building vulnerable infrastructure in LocalStack...")
-    
-    # Connect to LocalStack
-    ec2 = boto3.client('ec2', region_name='us-east-1', endpoint_url='http://localhost:4566')
-    
-    # Create VPC
-    vpc = ec2.create_vpc(CidrBlock='10.0.0.0/16')
-    vpc_id = vpc['Vpc']['VpcId']
-    
-    # Create Security Group with a unique name
-    unique_sg_name = f'production-web-sg-{int(time.time())}'
-    sg = ec2.create_security_group(
-        GroupName=unique_sg_name,
-        Description='SG for production web server',
-        VpcId=vpc_id
-    )
-    sg_id = sg['GroupId']
-    print(f"✅ Created Mock Security Group: {sg_id}")
-    
-    # Simulate the vulnerability (Open Port 22)
-    ec2.authorize_security_group_ingress(
-        GroupId=sg_id,
-        IpPermissions=[
-            {'IpProtocol': 'tcp', 'FromPort': 22, 'ToPort': 22, 'IpRanges': [{'CidrIp': '0.0.0.0/0'}]}
-        ]
-    )
-    print("⚠️  Simulated Vulnerability: SSH (Port 22) is open to the world.\n")
+from aiops.core import SSH_WORLD_IPV4, utc_now
+from aiops.integrations import ROOT, localstack_client
 
-    print("🚨 Step 2: Generating CloudWatch Alert...")
-    
-    # Generate the JSON Alert automatically using the exact sg_id
-    alert_data = {
-        "alert_id": f"ALT-{int(time.time())}",
-        "severity": "CRITICAL",
-        "description": "Unauthorized SSH brute-force attempt detected.",
-        "affected_resource_id": sg_id, 
-        "attacker_ip": "192.168.1.50",
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    }
-    
-    with open('cloud_alert.json', 'w') as f:
-        json.dump(alert_data, f, indent=4)
-        
-    print("✅ Alert generated and synced successfully: cloud_alert.json")
-    print("\n🚀 You are perfectly synced! Go to your Streamlit dashboard and Launch the Agent.")
+
+def setup_synced_scenario(ec2=None, output=None):
+    ec2 = ec2 or localstack_client()  # Adapter pins endpoint to localhost:4566.
+    output = Path(output or ROOT / "cloud_alert.json")
+    vpc_id = ec2.create_vpc(CidrBlock="10.41.0.0/16")["Vpc"]["VpcId"]
+    group_id = ec2.create_security_group(GroupName=f"sentinelops-demo-{time.time_ns()}",
+                                          Description="Deliberately vulnerable LOCALSTACK demo resource",
+                                          VpcId=vpc_id)["GroupId"]
+    ec2.authorize_security_group_ingress(GroupId=group_id, IpPermissions=[SSH_WORLD_IPV4])
+    record = {"alert_id": f"ALT-{int(time.time())}", "severity": "CRITICAL",
+              "description": "Unsafe public SSH ingress: TCP port 22 allowed from 0.0.0.0/0.",
+              "affected_resource_id": group_id, "attacker_ip": "198.51.100.24", "timestamp": utc_now()}
+    output.write_text(json.dumps(record, indent=2), encoding="utf-8")
+    print(f"Created LocalStack VPC {vpc_id}, vulnerable SG {group_id}. Alert saved: {output}")
+    return record
+
 
 if __name__ == "__main__":
     setup_synced_scenario()
