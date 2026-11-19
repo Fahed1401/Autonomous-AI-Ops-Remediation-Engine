@@ -1,0 +1,12 @@
+boto3
+awscli
+langchain
+langchain-community
+langchain-chroma
+langchain-huggingface
+langchain-ollama
+chromadb
+sentence-transformers
+unstructured
+markdown
+streamlit
