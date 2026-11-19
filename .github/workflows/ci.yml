@@ -18,3 +18,10 @@ jobs:
         run: python -m compileall -q aiops api_server.py app.py master_setup.py ingest_sops.py reasoning_engine.py agent_execution.py
       - name: Frontend JS syntax
         run: node --check frontend/app.js
+
+      - name: Public Vercel portfolio syntax checks
+        run: |
+          node --check portfolio/public/app.js
+          node --check portfolio/public/demo-api.js
+      - name: Public Vercel portfolio regression tests
+        run: node portfolio/test-demo.cjs

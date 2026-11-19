@@ -1,0 +1,60 @@
+/* Dependency-free regression checks for the PUBLIC browser-only scenario. */
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+const code = fs.readFileSync(path.join(__dirname,'public','demo-api.js'),'utf8');
+function makeAPI() {
+  const context=vm.createContext({Date,Math,JSON,Map,String,Error});
+  // No fetch / XMLHttpRequest / filesystem / AWS SDK is injected here.
+  vm.runInContext(code,context,{filename:'demo-api.js'});
+  return context.SentinelOpsDemoAPI;
+}
+(async () => {
+  const api=makeAPI();
+  const initial=await api('/api/overview');
+  assert.equal(initial.mode,'demo');
+  assert.equal(initial.summary.total,5);
+  assert.equal(initial.summary.critical,1);
+  assert.equal(initial.capabilities.real_aws,false);
+  assert.equal(initial.capabilities.automated_execution,false);
+  assert.equal(initial.incidents.some(i=>i.actionable && i.status==='Open'),true);
+  const health=await api('/api/health');
+  assert.equal(health.api,'browser-only');
+  const runbook=await api('/api/runbooks');
+  assert.equal(runbook.mode,'fallback');
+  assert.match(runbook.source,/static portfolio SOP/);
+  await assert.rejects(api('/api/analyze',{incident_id:'INC-2402'}),/No demo playbook/);
+  await assert.rejects(api('/api/analyze',{incident_id:'INJECTED'}),/Incident not found/);
+  const plan=await api('/api/analyze',{incident_id:'INC-2401'});
+  assert.match(plan.approval_phrase,/^REVOKE SSH sg-/);
+  assert.equal(plan.ai_summary.source.includes('no live LLM'),true);
+  await assert.rejects(api('/api/approve',{plan_id:plan.id,confirmation:'WRONG',acknowledged:true}),/rejected/);
+  await assert.rejects(api('/api/execute',{plan_id:plan.id,approval_token:'junk'}),/blocked/);
+  const approved=await api('/api/approve',{plan_id:plan.id,confirmation:plan.approval_phrase,acknowledged:true});
+  assert.equal(approved.expires_in_seconds,120);
+  const executed=await api('/api/execute',{plan_id:plan.id,approval_token:approved.approval_token});
+  assert.equal(executed.simulation,true);
+  assert.equal(executed.verified,true);
+  assert.match(executed.message,/No real EC2 or LocalStack/);
+  await assert.rejects(api('/api/execute',{plan_id:plan.id,approval_token:approved.approval_token}),/blocked/);
+  const resolved=await api('/api/overview');
+  assert.equal(resolved.summary.active,2);
+  assert.equal(resolved.summary.resolved,3);
+  assert.ok(resolved.audit.some(e=>e.action==='APPROVAL_REJECTED'));
+  assert.ok(resolved.audit.some(e=>e.action==='REMEDIATION_EXECUTED'));
+  await api('/api/reset',{});
+  const reset=await api('/api/overview');
+  assert.equal(reset.summary.active,3);
+  assert.equal(reset.summary.resolved,2);
+  await assert.rejects(api('/api/execute',{plan_id:plan.id,approval_token:approved.approval_token}),/expired|unavailable/);
+  const html=fs.readFileSync(path.join(__dirname,'public','index.html'),'utf8');
+  assert.ok(html.indexOf('/demo-api.js')===-1 || html.includes('./demo-api.js'));
+  assert.ok(html.indexOf('src="./demo-api.js"')<html.indexOf('src="./app.js"'));
+  for(const x of ['app.js','demo-api.js','styles.css','favicon.svg'])assert.ok(fs.statSync(path.join(__dirname,'public',x)).isFile());
+  const config=JSON.parse(fs.readFileSync(path.join(__dirname,'vercel.json'),'utf8'));
+  assert.equal(config.framework,null);
+  assert.equal(config.outputDirectory,'public');
+  assert.ok(!('buildCommand' in config));
+  console.log('Public browser demo regression checks passed.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

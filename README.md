@@ -123,3 +123,7 @@ Avoid claiming measured MTTR improvements, SOC deployment, real AWS protection, 
 - Runbook matches are advisory; there is no policy-authoring governance or general-purpose remediation agent.
 
 Licensed according to your original repository's license, if any; add an explicit license before public reuse.
+
+## Public Vercel portfolio preview (static / safe)
+
+Deploy `portfolio/` with **Vercel Root Directory = `portfolio`**, Framework = **Other**, Output Directory = **public** (`portfolio/vercel.json`). The public site runs an interactive browser-only sample with mock incidents and no API or AWS access; the original Python + LocalStack application remains local. See `portfolio/README.md`.
