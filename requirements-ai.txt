@@ -1,0 +1,7 @@
+# Optional: offline embedding / Chroma semantic retrieval.
+# Model assets are downloaded when first run unless cached locally.
+langchain-chroma>=0.2
+langchain-huggingface>=0.1
+langchain-text-splitters>=0.3
+langchain-core>=0.3
+sentence-transformers>=3.3

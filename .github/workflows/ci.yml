@@ -1,0 +1,20 @@
+name: Validate AIOps Lab
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python unit and API tests
+        run: python -m unittest discover -s tests -v
+      - name: Python compile checks
+        run: python -m compileall -q aiops api_server.py app.py master_setup.py ingest_sops.py reasoning_engine.py agent_execution.py
+      - name: Frontend JS syntax
+        run: node --check frontend/app.js

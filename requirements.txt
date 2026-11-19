@@ -1,12 +1,3 @@
-boto3
-awscli
-langchain
-langchain-community
-langchain-chroma
-langchain-huggingface
-langchain-ollama
-chromadb
-sentence-transformers
-unstructured
-markdown
-streamlit
+# Demo mode requires only the Python 3.11+ standard library.
+# Install this optional dependency when using LocalStack:
+boto3>=1.34,<2
